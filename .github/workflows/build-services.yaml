@@ -1,0 +1,39 @@
+name: "Build and Push service"
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - 'docs/**'
+      - '.run/**'
+      - 'api/**'
+      - 'features/**'
+      - 'config/**'
+      - 'deployments/**'
+      - '*.md'
+    tags:
+      - v*
+
+  pull_request:
+    types: [ opened, synchronize ]
+    branches:
+      - master
+    paths-ignore:
+      - 'docs/**'
+      - '.run/**'
+      - 'api/**'
+      - 'features/**'
+      - 'config/**'
+      - 'deployments/**'
+      - '*.md'
+  workflow_dispatch:
+
+jobs:
+  build-service:
+    name: "Build and Push service"
+    uses: ./.github/workflows/build.yaml
+    with:
+      service: s3-gateway
+      docker_repository: s3-gateway
+      dockerfile: "./build/Dockerfile"
+
