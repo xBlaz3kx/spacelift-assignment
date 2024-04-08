@@ -1,7 +1,7 @@
 package main
 
-import "log"
+import "github.com/spacelift-io/homework-object-storage/cmd"
 
 func main() {
-	log.Println("Hello world!!!")
+	cmd.Execute()
 }
