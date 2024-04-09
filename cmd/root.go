@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	docker "github.com/docker/docker/client"
 	"github.com/spacelift-io/homework-object-storage/internal/api"
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"os"
+	"os/signal"
 )
 
 var cfgFile string
@@ -20,6 +22,9 @@ var rootCmd = &cobra.Command{
 	Short: "S3 Gateway server",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx, end := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer end()
+
 		logger := zap.L()
 		logger.Info("Starting S3 gateway server")
 
@@ -32,7 +37,10 @@ var rootCmd = &cobra.Command{
 		discoveryService := discovery.NewServiceV1(dockerClient)
 		gatewayService := gateway.NewServiceV1(discoveryService)
 
-		api.NewServer(logger, gatewayService, ":3000")
+		httpServer := api.NewServer(logger, gatewayService)
+		httpServer.Run(":3000")
+
+		<-ctx.Done()
 	},
 	Version: "0.0.1",
 }

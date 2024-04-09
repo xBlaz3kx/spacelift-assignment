@@ -4,11 +4,19 @@ import (
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
+	timeout2 "github.com/gofiber/fiber/v2/middleware/timeout"
 	"github.com/spacelift-io/homework-object-storage/internal/gateway"
 	"go.uber.org/zap"
+	"time"
 )
 
-func NewServer(logger *zap.Logger, service gateway.Service, listenAddress string) {
+type Server struct {
+	logger  *zap.Logger
+	service gateway.Service
+	app     *fiber.App
+}
+
+func NewServer(logger *zap.Logger, service gateway.Service) *Server {
 	// Initialize a new Fiber app
 	app := fiber.New()
 
@@ -28,20 +36,37 @@ func NewServer(logger *zap.Logger, service gateway.Service, listenAddress string
 		ReadinessEndpoint: "/ready",
 	})
 
-	// Add logger and health check middleware
-	app.Use(fiberzap.New(config), healthCheck)
+	// todo timeout handler
+	h := func(c *fiber.Ctx) error {
+		return c.SendString("Hello, World!")
+	}
+	timeoutHandler := timeout2.NewWithContext(h, time.Second*10)
 
-	GatewayRoutes(app, service)
+	// Add logger, timeout and health check middleware
+	app.Use(fiberzap.New(config), timeoutHandler, healthCheck)
 
-	// Start the server on port 3000
-	err := app.Listen(listenAddress)
-	if err != nil {
-		logger.Fatal("failed to start server", zap.Error(err))
+	return &Server{
+		logger:  logger,
+		service: service,
+		app:     app,
 	}
 }
 
-func GatewayRoutes(app *fiber.App, service gateway.Service) {
-	group := app.Group("/object")
+// Run starts the server that will listen on the given address
+func (s *Server) Run(listenAddress string) {
+	// Mount gateway routes
+	s.gatewayRoutes()
+
+	// Start the server on port 3000
+	err := s.app.Listen(listenAddress)
+	if err != nil {
+		s.logger.Fatal("failed to start server", zap.Error(err))
+	}
+}
+
+// gatewayRoutes defines the routes for the gateway service
+func (s *Server) gatewayRoutes() {
+	group := s.app.Group("/object")
 	group.Put("/:id", func(c *fiber.Ctx) error {
 
 		return nil
