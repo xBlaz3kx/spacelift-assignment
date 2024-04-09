@@ -39,7 +39,7 @@ services:
     image: amazin-object-storage-gateway
     restart: on-failure
     build:
-      dockerfile: ../build/Dockerfile
+      dockerfile: ./build/Dockerfile
       context: ..
     ports:
       - "3000:3000"

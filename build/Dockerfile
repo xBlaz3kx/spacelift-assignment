@@ -1,4 +1,4 @@
-FROM golang:1.21.1 as build
+FROM golang:1.21.1-alpine as build
 
 WORKDIR /mnt/homework
 
@@ -6,6 +6,7 @@ WORKDIR /mnt/homework
 ENV GOCACHE=/root/.cache/go-build
 ENV GOMODCACHE=/root/.cache/go-build
 ENV GO111MODULE=on
+ENV GOARCH=amd64
 ENV CGO_ENABLED=0
 ENV GOOS=linux
 
@@ -17,7 +18,7 @@ RUN go mod verify
 # Copy the rest of the source code
 COPY . .
 
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -o ../gateway ./cmd
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -o ./gateway ./cmd
 
 # Debug stage using Delve
 FROM build as debug
@@ -29,6 +30,7 @@ WORKDIR /mnt/homework
 # Install Delve and build the application
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 RUN go build -gcflags="all=-N -l" -o ./gateway ./cmd
+
 CMD ["/go/bin/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "./gateway"]
 
 FROM alpine as app
@@ -37,6 +39,11 @@ FROM alpine as app
 RUN apk --update --no-cache add curl
 
 SHELL ["/bin/sh", "-l", "-c"]
+
+# Copy the binary from the build stage
+COPY --chown=$user:$group --from=build /mnt/homework/gateway /usr/local/bin/gateway
+RUN chmod +x /usr/local/bin/gateway
+WORKDIR /usr/local/gateway
 
 # Create a non-root user
 ARG user=app
@@ -47,18 +54,12 @@ RUN adduser \
     --gecos "" \
     --ingroup $group \
     $user
-
-# Copy the binary from the build stage
-COPY --chown=$user:$group --from=build /mnt/gateway /usr/local/bin/gateway
-RUN chmod +x /usr/local/bin/gateway
-
 USER $user
-WORKDIR /usr/local/gateway
 
 # Expose the default http port
 EXPOSE 3000
 
 # Add healthcheck
-HEALTHCHECK --interval=1s --timeout=1s --start-period=2s --retries=3 CMD curl -f http://localhost:3000/health || exit 1
+HEALTHCHECK --interval=1s --timeout=1s --start-period=2s --retries=3 CMD curl -f http://localhost:3000/ready || exit 1
 
 CMD ["/usr/local/bin/gateway"]
