@@ -17,7 +17,7 @@ RUN go mod verify
 # Copy the rest of the source code
 COPY . .
 
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -o ../gateway ./cmd/gateway
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -o ../gateway ./cmd
 
 # Debug stage using Delve
 FROM build as debug
@@ -28,7 +28,7 @@ WORKDIR /mnt/homework
 
 # Install Delve and build the application
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
-RUN go build -gcflags="all=-N -l" -o ./gateway ./cmd/gateway
+RUN go build -gcflags="all=-N -l" -o ./gateway ./cmd
 CMD ["/go/bin/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "./gateway"]
 
 FROM alpine as app
