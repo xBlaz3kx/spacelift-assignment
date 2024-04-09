@@ -73,7 +73,7 @@ func (s *ServiceV1) GetObject(ctx context.Context, objectId string) ([]byte, err
 	}
 
 	// Get the object from the S3 instance
-	object, err := client.GetObject(ctx, "mybucket", objectId, minio.GetObjectOptions{})
+	_, err = client.GetObject(ctx, "mybucket", objectId, minio.GetObjectOptions{})
 	if err != nil {
 		return nil, err
 	}
