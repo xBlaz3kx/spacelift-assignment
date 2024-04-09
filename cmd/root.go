@@ -2,7 +2,11 @@ package cmd
 
 import (
 	"fmt"
+	docker "github.com/docker/docker/client"
 	"github.com/spacelift-io/homework-object-storage/internal/api"
+	"github.com/spacelift-io/homework-object-storage/internal/discovery"
+	"github.com/spacelift-io/homework-object-storage/internal/gateway"
+	"github.com/spacelift-io/homework-object-storage/internal/pkg/observability"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -19,7 +23,16 @@ var rootCmd = &cobra.Command{
 		logger := zap.L()
 		logger.Info("Starting S3 gateway server")
 
-		api.NewServer(logger, nil, ":3000")
+		// Connect to the Docker daemon
+		dockerClient, err := docker.NewClientWithOpts(docker.FromEnv, docker.WithAPIVersionNegotiation())
+		if err != nil {
+			logger.Fatal("Failed to create Docker client", zap.Error(err))
+		}
+
+		discoveryService := discovery.NewServiceV1(dockerClient)
+		gatewayService := gateway.NewServiceV1(discoveryService)
+
+		api.NewServer(logger, gatewayService, ":3000")
 	},
 	Version: "0.0.1",
 }
@@ -61,4 +74,6 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
+
+	observability.NewLogger("debug")
 }

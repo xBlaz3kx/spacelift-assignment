@@ -6,13 +6,8 @@ import (
 	"os"
 )
 
-func init() {
-	logger := newLogger("debug")
-	zap.ReplaceGlobals(logger)
-}
-
-// newLogger creates a new JSON logger with the given log level, writing logs to stdout and stderr.
-func newLogger(logLevel string) *zap.Logger {
+// NewLogger creates a new JSON logger with the given log level, writing logs to stdout and stderr.
+func NewLogger(logLevel string) *zap.Logger {
 
 	level := zapcore.InfoLevel
 	switch logLevel {
