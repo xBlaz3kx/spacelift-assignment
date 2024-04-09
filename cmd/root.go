@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"context"
-	"fmt"
 	docker "github.com/docker/docker/client"
-	"github.com/spacelift-io/homework-object-storage/internal/api"
+	"github.com/spacelift-io/homework-object-storage/internal/api/http"
 	"github.com/spacelift-io/homework-object-storage/internal/discovery"
 	"github.com/spacelift-io/homework-object-storage/internal/gateway"
 	"github.com/spacelift-io/homework-object-storage/internal/pkg/observability"
@@ -12,7 +10,6 @@ import (
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"os"
-	"os/signal"
 )
 
 var cfgFile string
@@ -22,8 +19,8 @@ var rootCmd = &cobra.Command{
 	Short: "S3 Gateway server",
 	Long:  ``,
 	Run: func(cmd *cobra.Command, args []string) {
-		ctx, end := signal.NotifyContext(context.Background(), os.Interrupt)
-		defer end()
+		// ctx, end := signal.NotifyContext(context.Background(), os.Interrupt)
+		// defer end()
 
 		logger := zap.L()
 		logger.Info("Starting S3 gateway server")
@@ -37,10 +34,10 @@ var rootCmd = &cobra.Command{
 		discoveryService := discovery.NewServiceV1(dockerClient)
 		gatewayService := gateway.NewServiceV1(discoveryService)
 
-		httpServer := api.NewServer(logger, gatewayService)
+		httpServer := http.NewServer(logger, gatewayService)
 		httpServer.Run(":3000")
 
-		<-ctx.Done()
+		// <-ctx.Done()
 	},
 	Version: "0.0.1",
 }
@@ -80,7 +77,7 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		zap.L().Debug("Using config file", zap.String("file", viper.ConfigFileUsed()))
 	}
 
 	observability.NewLogger("debug")

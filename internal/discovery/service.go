@@ -5,7 +5,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
-	"github.com/spacelift-io/homework-object-storage/internal/models/service"
 	"go.uber.org/zap"
 	"strconv"
 	"strings"
@@ -19,7 +18,7 @@ const (
 )
 
 type Service interface {
-	DiscoverS3Instances(ctx context.Context) ([]service.S3Instance, error)
+	DiscoverS3Instances(ctx context.Context) ([]S3Instance, error)
 	Ready(ctx context.Context) bool
 }
 
@@ -36,7 +35,7 @@ func NewServiceV1(dockerClient *docker.Client) *ServiceV1 {
 }
 
 // DiscoverS3Instances returns a list of available S3 instances from the Docker daemon, filtered by the prefix.
-func (s *ServiceV1) DiscoverS3Instances(ctx context.Context) ([]service.S3Instance, error) {
+func (s *ServiceV1) DiscoverS3Instances(ctx context.Context) ([]S3Instance, error) {
 	s.logger.Info("Discovering S3 instances")
 
 	// Get the list of active containers - we will filter out the ones that are not S3 instances
@@ -45,7 +44,7 @@ func (s *ServiceV1) DiscoverS3Instances(ctx context.Context) ([]service.S3Instan
 		return nil, errors.Wrap(err, "failed to list containers")
 	}
 
-	response := []service.S3Instance{}
+	response := []S3Instance{}
 
 	for _, c := range containers {
 		for _, name := range c.Names {
@@ -69,7 +68,7 @@ func (s *ServiceV1) DiscoverS3Instances(ctx context.Context) ([]service.S3Instan
 }
 
 // getContainerDetails returns the details of a container
-func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string) (*service.S3Instance, error) {
+func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string) (*S3Instance, error) {
 	inspectedContainer, err := s.dockerClient.ContainerInspect(ctx, containerId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to inspect container")
@@ -92,7 +91,7 @@ func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string)
 		return nil, errors.Wrap(err, "failed to parse instance ID")
 	}
 
-	return &service.S3Instance{
+	return &S3Instance{
 		ContainerId: containerId,
 		InstanceNum: instanceId,
 		IpAddress:   inspectedContainer.NetworkSettings.IPAddress,

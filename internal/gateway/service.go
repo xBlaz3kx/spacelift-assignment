@@ -6,7 +6,6 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pkg/errors"
 	"github.com/spacelift-io/homework-object-storage/internal/discovery"
-	"github.com/spacelift-io/homework-object-storage/internal/models/service"
 	"go.uber.org/zap"
 )
 
@@ -92,7 +91,7 @@ func (s *ServiceV1) Ready(ctx context.Context) bool {
 }
 
 // newMinioClient creates a new instance of the Minio client based on the S3 instance
-func newMinioClient(instance service.S3Instance) (*minio.Client, error) {
+func newMinioClient(instance discovery.S3Instance) (*minio.Client, error) {
 	minioClient, err := minio.New(instance.IpAddress, &minio.Options{
 		Creds:  credentials.NewStaticV4("", instance.AccessKey, instance.SecretKey),
 		Secure: false,

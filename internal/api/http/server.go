@@ -1,11 +1,13 @@
-package api
+package http
 
 import (
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
-	timeout2 "github.com/gofiber/fiber/v2/middleware/timeout"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/timeout"
 	"github.com/spacelift-io/homework-object-storage/internal/gateway"
+	"github.com/spacelift-io/homework-object-storage/internal/pkg/http/middleware"
 	"go.uber.org/zap"
 	"time"
 )
@@ -17,8 +19,9 @@ type Server struct {
 }
 
 func NewServer(logger *zap.Logger, service gateway.Service) *Server {
-	// Initialize a new Fiber app
-	app := fiber.New()
+	// Initialize a new Fiber app with a custom error handler
+	fiberConfig := fiber.Config{ErrorHandler: middleware.FiberErrorHandler()}
+	app := fiber.New(fiberConfig)
 
 	// Use zap logger middleware
 	config := fiberzap.ConfigDefault
@@ -36,14 +39,8 @@ func NewServer(logger *zap.Logger, service gateway.Service) *Server {
 		ReadinessEndpoint: "/ready",
 	})
 
-	// todo timeout handler
-	h := func(c *fiber.Ctx) error {
-		return c.SendString("Hello, World!")
-	}
-	timeoutHandler := timeout2.NewWithContext(h, time.Second*10)
-
-	// Add logger, timeout and health check middleware
-	app.Use(fiberzap.New(config), timeoutHandler, healthCheck)
+	// Add logger, recovery, timeout and health check middleware
+	app.Use(fiberzap.New(config), recover.New(), healthCheck)
 
 	return &Server{
 		logger:  logger,
@@ -67,13 +64,16 @@ func (s *Server) Run(listenAddress string) {
 // gatewayRoutes defines the routes for the gateway service
 func (s *Server) gatewayRoutes() {
 	group := s.app.Group("/object")
-	group.Put("/:id", func(c *fiber.Ctx) error {
+
+	uploadHandler := func(c *fiber.Ctx) error {
+		return nil
+	}
+
+	downloadHandler := func(c *fiber.Ctx) error {
 
 		return nil
-	})
+	}
 
-	group.Get("/:id", func(c *fiber.Ctx) error {
-
-		return nil
-	})
+	group.Put("/:id", timeout.NewWithContext(uploadHandler, time.Second*10))
+	group.Get("/:id", timeout.NewWithContext(downloadHandler, time.Second*10))
 }

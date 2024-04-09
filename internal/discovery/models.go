@@ -1,4 +1,4 @@
-package service
+package discovery
 
 type S3Instance struct {
 	// Id of the container running the S3 instance
