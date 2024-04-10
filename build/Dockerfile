@@ -1,4 +1,4 @@
-FROM golang:1.21.1-alpine as build
+FROM golang:1.21.1 as build
 
 WORKDIR /mnt/homework
 
@@ -18,7 +18,7 @@ RUN go mod verify
 # Copy the rest of the source code
 COPY . .
 
-RUN --mount=type=cache,target="/root/.cache/go-build" go build -o ./gateway ./cmd
+RUN --mount=type=cache,target="/root/.cache/go-build" go build -o ./gateway main.go
 
 # Debug stage using Delve
 FROM build as debug
@@ -60,6 +60,6 @@ USER $user
 EXPOSE 3000
 
 # Add healthcheck
-HEALTHCHECK --interval=1s --timeout=1s --start-period=2s --retries=3 CMD curl -f http://localhost:3000/ready || exit 1
+HEALTHCHECK --interval=5s --timeout=1s --start-period=3s --retries=3 CMD curl -f http://localhost:3000/live || exit 1
 
 CMD ["/usr/local/bin/gateway"]

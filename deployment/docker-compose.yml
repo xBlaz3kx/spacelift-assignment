@@ -41,6 +41,7 @@ services:
     build:
       dockerfile: ./build/Dockerfile
       context: ..
+      target: app
     ports:
       - "3000:3000"
     networks:
