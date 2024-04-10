@@ -3,6 +3,7 @@ package middleware
 import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
+	"github.com/spacelift-io/homework-object-storage/internal/models/api"
 )
 
 // FiberErrorHandler is a middleware that handles errors returned by the handlers
@@ -18,6 +19,8 @@ func FiberErrorHandler() func(ctx *fiber.Ctx, err error) error {
 		}
 
 		// Return from handler
-		return ctx.Status(code).JSON(fiber.Map{})
+		return ctx.Status(code).JSON(api.ErrorResponse{
+			Message: err.Error(),
+		})
 	}
 }
