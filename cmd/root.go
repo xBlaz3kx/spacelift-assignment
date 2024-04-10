@@ -30,6 +30,7 @@ var rootCmd = &cobra.Command{
 		if err != nil {
 			logger.Fatal("Failed to create Docker client", zap.Error(err))
 		}
+		defer dockerClient.Close()
 
 		discoveryService := discovery.NewServiceV1(dockerClient)
 		gatewayService := gateway.NewServiceV1(discoveryService)
@@ -80,5 +81,5 @@ func initConfig() {
 		zap.L().Debug("Using config file", zap.String("file", viper.ConfigFileUsed()))
 	}
 
-	observability.NewLogger("debug")
+	zap.ReplaceGlobals(observability.NewLogger("debug"))
 }

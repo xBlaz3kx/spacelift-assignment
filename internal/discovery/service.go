@@ -69,6 +69,8 @@ func (s *ServiceV1) DiscoverS3Instances(ctx context.Context) ([]S3Instance, erro
 
 // getContainerDetails returns the details of a container
 func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string) (*S3Instance, error) {
+	s.logger.Info("Inspecting container", zap.String("containerId", containerId))
+
 	inspectedContainer, err := s.dockerClient.ContainerInspect(ctx, containerId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to inspect container")
@@ -105,6 +107,7 @@ func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string)
 
 // Ready checks if the service is ready (if Docker client is connected)
 func (s *ServiceV1) Ready(ctx context.Context) bool {
+	s.logger.Debug("Checking if the service is ready")
 	if s.dockerClient == nil {
 		return false
 	}

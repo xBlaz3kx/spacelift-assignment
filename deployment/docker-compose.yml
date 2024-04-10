@@ -42,6 +42,10 @@ services:
       dockerfile: ./build/Dockerfile
       context: ..
       target: app
+    environment:
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    # Docker daemon requires root access
+    user: "root"
     ports:
       - "3000:3000"
     networks:
