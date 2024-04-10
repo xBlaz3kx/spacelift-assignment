@@ -5,8 +5,6 @@ import (
 	"hash/fnv"
 	"io"
 	"mime/multipart"
-	"sort"
-	"strconv"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -49,7 +47,7 @@ func (s *ServiceV1) AddOrUpdateObject(ctx context.Context, objectId string, data
 		return err
 	}
 
-	// Determine which instance to read from based on the objectId
+	// Determine which instance to write to based on the objectId
 	instance, err := s.assignObjectToInstance(ctx, objectId, instances)
 	if err != nil {
 		return errors.Wrap(err, "failed to assign object to instance")
@@ -123,19 +121,13 @@ func (s *ServiceV1) Ready(ctx context.Context) bool {
 // assignObjectToInstance chooses an instance to write an object to. A form of sharding is used to determine the instance.
 func (s *ServiceV1) assignObjectToInstance(ctx context.Context, objectId string, instances []discovery.S3Instance) (*discovery.S3Instance, error) {
 	s.logger.Debug("Assigning object to instance", zap.String("objectId", objectId))
+
+	// Hash the objectId and use the modulo of the hash to determine the instance
+	// https://medium.com/@nynptel/what-is-modular-hashing-9c1fbbb3c611
 	objectIdHash := hashId(objectId)
+	instanceNum := objectIdHash % uint64(len(instances))
 
-	sort.Slice(instances, func(i, j int) bool {
-		return hashId(strconv.Itoa(instances[i].InstanceNum)) < hashId(strconv.Itoa(instances[j].InstanceNum))
-	})
-
-	for _, instance := range instances {
-		if hashId(strconv.Itoa(instance.InstanceNum)) >= objectIdHash {
-			return &instance, nil
-		}
-	}
-
-	return nil, errors.New("no instance found")
+	return &instances[instanceNum], nil
 }
 
 func hashId(id string) uint64 {
