@@ -2,16 +2,17 @@ package gateway
 
 import (
 	"context"
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
-	"github.com/pkg/errors"
-	"github.com/spacelift-io/homework-object-storage/internal/discovery"
-	"go.uber.org/zap"
 	"hash/fnv"
 	"io"
 	"mime/multipart"
 	"sort"
 	"strconv"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/pkg/errors"
+	"github.com/spacelift-io/homework-object-storage/internal/discovery"
+	"go.uber.org/zap"
 )
 
 const bucketName = "spacelift-storage"
@@ -129,7 +130,7 @@ func (s *ServiceV1) assignObjectToInstance(ctx context.Context, objectId string,
 	})
 
 	for _, instance := range instances {
-		if hashId(instance.IpAddress) >= objectIdHash {
+		if hashId(strconv.Itoa(instance.InstanceNum)) >= objectIdHash {
 			return &instance, nil
 		}
 	}
