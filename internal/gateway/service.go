@@ -36,7 +36,8 @@ func NewServiceV1(discoveryService discovery.Service) *ServiceV1 {
 
 // AddOrUpdateObject adds or updates an object in one of the available S3 instances
 func (s *ServiceV1) AddOrUpdateObject(ctx context.Context, objectId string, data multipart.File) error {
-	s.logger.Info("Adding or updating object in S3", zap.String("objectId", objectId))
+	logger := s.logger.With(zap.String("objectId", objectId))
+	logger.Info("Adding or updating object in S3")
 
 	// Discover which S3 instances are available
 	instances, err := s.discoveryService.DiscoverS3Instances(ctx)
@@ -56,12 +57,14 @@ func (s *ServiceV1) AddOrUpdateObject(ctx context.Context, objectId string, data
 		return err
 	}
 
+	logger.Info("Adding object to S3 instance", zap.Int("instance", instance.InstanceNum))
 	return client.AddOrUpdateObject(ctx, objectId, data)
 }
 
 // GetObject fetches an object from an instance of S3
 func (s *ServiceV1) GetObject(ctx context.Context, objectId string) (io.Reader, error) {
-	s.logger.Info("Getting object from S3", zap.String("objectId", objectId))
+	logger := s.logger.With(zap.String("objectId", objectId))
+	logger.Info("Getting object from S3")
 
 	// Based on the ID, discover which S3 instance to use and fetch the object
 	instances, err := s.discoveryService.DiscoverS3Instances(ctx)
@@ -80,6 +83,8 @@ func (s *ServiceV1) GetObject(ctx context.Context, objectId string) (io.Reader, 
 	if err != nil {
 		return nil, err
 	}
+
+	logger.Info("Getting object from S3 instance", zap.Int("instance", instance.InstanceNum))
 
 	// Get the object from the S3 instance
 	obj, err := client.GetObject(ctx, objectId)
@@ -104,6 +109,11 @@ func (s *ServiceV1) Ready(ctx context.Context) bool {
 // assignObjectToInstance chooses an instance to write an object to. A form of sharding is used to determine the instance.
 func (s *ServiceV1) assignObjectToInstance(ctx context.Context, objectId string, instances []discovery.S3Instance) (*discovery.S3Instance, error) {
 	s.logger.Debug("Assigning object to instance", zap.String("objectId", objectId))
+
+	// If there are no instances available, return an error
+	if len(instances) == 0 {
+		return nil, errors.New("no instances available")
+	}
 
 	// Hash the objectId and use the modulo of the hash to determine the instance
 	// https://medium.com/@nynptel/what-is-modular-hashing-9c1fbbb3c611

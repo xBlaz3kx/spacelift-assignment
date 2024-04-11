@@ -2,6 +2,7 @@ package s3
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 
@@ -14,7 +15,9 @@ import (
 
 var ErrObjectNotFound = errors.New("object not found")
 
-const bucketName = "spacelift-storage"
+const (
+	bucketName = "spacelift-storage"
+)
 
 type Client interface {
 	AddOrUpdateObject(ctx context.Context, objectId string, data io.Reader) error
@@ -28,7 +31,7 @@ type MinioClient struct {
 
 // NewMinioClient creates a new instance of the Minio client based on the S3 instance
 func NewMinioClient(instance discovery.S3Instance) (*MinioClient, error) {
-	minioClient, err := minio.New(instance.IpAddress, &minio.Options{
+	minioClient, err := minio.New(fmt.Sprintf("%s:%s", instance.Hostname, instance.Port), &minio.Options{
 		Creds:  credentials.NewStaticV4("", instance.AccessKey, instance.SecretKey),
 		Secure: false,
 	})
@@ -42,6 +45,7 @@ func NewMinioClient(instance discovery.S3Instance) (*MinioClient, error) {
 	}, nil
 }
 
+// AddOrUpdateObject adds or updates an object in the S3 instance. If the object already exists, it will be overwritten and if the bucket does not exist, it will be created.
 func (c *MinioClient) AddOrUpdateObject(ctx context.Context, objectId string, data io.Reader) error {
 	c.logger.Info("Adding or updating object in S3", zap.String("objectId", objectId))
 
@@ -72,8 +76,9 @@ func (c *MinioClient) AddOrUpdateObject(ctx context.Context, objectId string, da
 	return nil
 }
 
+// GetObject fetches an object from the S3 instance.
 func (c *MinioClient) GetObject(ctx context.Context, objectId string) (io.Reader, error) {
-	c.logger.Info("Adding or updating object in S3", zap.String("objectId", objectId))
+	c.logger.Info("Getting the object from S3", zap.String("objectId", objectId))
 
 	// Get the object from the S3 instance
 	obj, err := c.client.GetObject(ctx, bucketName, objectId, minio.GetObjectOptions{})

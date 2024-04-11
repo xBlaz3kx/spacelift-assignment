@@ -12,10 +12,10 @@ import (
 )
 
 const (
-	s3ContainerPrefix = "/amazin-object-storage-node-"
+	s3ContainerPrefix = "amazin-object-storage-node-"
 	minioPort         = "9000"
-	minioAccessKey    = "MINIO_ACCESS_KEY"
-	minioSecret       = "MINIO_SECRET"
+	minioAccessKey    = "MINIO_ACCESS_KEY="
+	minioSecret       = "MINIO_SECRET_KEY="
 )
 
 type Service interface {
@@ -51,7 +51,7 @@ func (s *ServiceV1) DiscoverS3Instances(ctx context.Context) ([]S3Instance, erro
 	for _, c := range containers {
 		for _, name := range c.Names {
 			// Include only the containers that have the "amazin-object-storage-node-" in their name
-			if strings.HasPrefix(name, s3ContainerPrefix) {
+			if strings.Contains(name, s3ContainerPrefix) {
 				s.logger.Info("Found an S3 instance container", zap.String("containerId", c.ID), zap.String("name", name))
 
 				// Get the container details
@@ -78,6 +78,22 @@ func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string)
 		return nil, errors.Wrap(err, "failed to inspect container")
 	}
 
+	// Example: "/deployment-amazin-object-storage-node-2-1"
+	// We need to trim any /<> from the name and remove the trailing -1 if it exists
+	containerName := strings.Trim(inspectedContainer.Name, "/")
+	nameParts := strings.Split(containerName, "-")
+	prefix := s3ContainerPrefix
+	if nameParts[0] != "amazin" {
+		prefix = nameParts[0] + "-" + s3ContainerPrefix
+	}
+
+	// Extract the instance ID from the container name - the number after the prefix
+	instanceIdString := strings.TrimSuffix(strings.TrimPrefix(containerName, prefix), "-1")
+	instanceId, err := strconv.Atoi(instanceIdString)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse instance ID")
+	}
+
 	// Extract the access key and secret key from the container environment
 	s3AccessKey, s3SecretKey := "", ""
 	for _, environmentVariable := range inspectedContainer.Config.Env {
@@ -86,13 +102,6 @@ func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string)
 		} else if strings.HasPrefix(environmentVariable, minioSecret) {
 			s3SecretKey = strings.Split(environmentVariable, "=")[1]
 		}
-	}
-
-	// Extract the instance ID from the container name - it is the number after the prefix
-	instanceIdString := strings.TrimPrefix(inspectedContainer.Name, s3ContainerPrefix)
-	instanceId, err := strconv.Atoi(instanceIdString)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse instance ID")
 	}
 
 	return &S3Instance{
