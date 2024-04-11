@@ -2,12 +2,13 @@ package discovery
 
 import (
 	"context"
+	"strconv"
+	"strings"
+
 	"github.com/docker/docker/api/types/container"
 	docker "github.com/docker/docker/client"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -35,6 +36,7 @@ func NewServiceV1(dockerClient *docker.Client) *ServiceV1 {
 }
 
 // DiscoverS3Instances returns a list of available S3 instances from the Docker daemon, filtered by the prefix.
+// Possible improvement - implement a cache for the instances, so we don't have to query Docker every time.
 func (s *ServiceV1) DiscoverS3Instances(ctx context.Context) ([]S3Instance, error) {
 	s.logger.Info("Discovering S3 instances")
 

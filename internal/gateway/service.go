@@ -6,14 +6,11 @@ import (
 	"io"
 	"mime/multipart"
 
-	"github.com/minio/minio-go/v7"
-	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pkg/errors"
 	"github.com/spacelift-io/homework-object-storage/internal/discovery"
+	"github.com/spacelift-io/homework-object-storage/internal/pkg/s3"
 	"go.uber.org/zap"
 )
-
-const bucketName = "spacelift-storage"
 
 // Service is the interface that provides the methods to interact with the S3 instances
 type Service interface {
@@ -54,27 +51,12 @@ func (s *ServiceV1) AddOrUpdateObject(ctx context.Context, objectId string, data
 	}
 
 	// Minio client must be dynamically created, based on the S3 instance
-	client, err := newMinioClient(*instance)
+	client, err := s3.NewMinioClient(*instance)
 	if err != nil {
 		return err
 	}
 
-	// Check if the bucket exists, if not create it
-	exists, err := client.BucketExists(ctx, bucketName)
-	if err != nil {
-		return errors.Wrap(err, "failed to check if bucket exists")
-	}
-	if !exists {
-		// Check if bucket exists, if not create it
-		err = client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-		if err != nil {
-			return errors.Wrap(err, "failed to create a new bucket")
-		}
-	}
-
-	// Put the object in the S3 instance
-	_, err = client.PutObject(ctx, bucketName, objectId, data, 1, minio.PutObjectOptions{})
-	return err
+	return client.AddOrUpdateObject(ctx, objectId, data)
 }
 
 // GetObject fetches an object from an instance of S3
@@ -94,14 +76,15 @@ func (s *ServiceV1) GetObject(ctx context.Context, objectId string) (io.Reader, 
 	}
 
 	// Minio client must be dynamically created, based on the S3 instance
-	client, err := newMinioClient(*instance)
+	client, err := s3.NewMinioClient(*instance)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get the object from the S3 instance
-	obj, err := client.GetObject(ctx, bucketName, objectId, minio.GetObjectOptions{})
+	obj, err := client.GetObject(ctx, objectId)
 	if err != nil {
+
 		return nil, errors.Wrap(err, "failed to get object from S3")
 	}
 
@@ -134,17 +117,4 @@ func hashId(id string) uint64 {
 	hash := fnv.New64a()
 	hash.Write([]byte(id))
 	return hash.Sum64()
-}
-
-// newMinioClient creates a new instance of the Minio client based on the S3 instance
-func newMinioClient(instance discovery.S3Instance) (*minio.Client, error) {
-	minioClient, err := minio.New(instance.IpAddress, &minio.Options{
-		Creds:  credentials.NewStaticV4("", instance.AccessKey, instance.SecretKey),
-		Secure: false,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to create Minio client")
-	}
-
-	return minioClient, nil
 }

@@ -1,6 +1,9 @@
 package http
 
 import (
+	"errors"
+	"time"
+
 	"github.com/gofiber/contrib/fiberzap/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/healthcheck"
@@ -9,8 +12,8 @@ import (
 	"github.com/spacelift-io/homework-object-storage/internal/gateway"
 	"github.com/spacelift-io/homework-object-storage/internal/models/api"
 	"github.com/spacelift-io/homework-object-storage/internal/pkg/http/middleware"
+	"github.com/spacelift-io/homework-object-storage/internal/pkg/s3"
 	"go.uber.org/zap"
-	"time"
 )
 
 type Server struct {
@@ -74,7 +77,7 @@ func (s *Server) gatewayRoutes() {
 		// Validate objectId
 
 		// Get file from form
-		file, err := c.FormFile("fileUpload")
+		file, err := c.FormFile("file")
 		if err != nil {
 			return err
 		}
@@ -87,9 +90,11 @@ func (s *Server) gatewayRoutes() {
 
 		// Call the gatewayService to upload the object
 		err = s.gatewayService.AddOrUpdateObject(c.Context(), objectId, buffer)
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			return c.Status(fiber.StatusCreated).JSON(api.ErrorResponse{Message: "Object uploaded successfully"})
+		case errors.Is(err, fiber.ErrRequestTimeout):
+			return c.Status(fiber.StatusServiceUnavailable).JSON(api.ErrorResponse{Message: "Request timed out"})
 		default:
 			s.logger.Error("Failed to process request", zap.Error(err))
 			return c.Status(fiber.StatusInternalServerError).JSON(api.ErrorResponse{Message: "Failed to upload object"})
@@ -101,9 +106,13 @@ func (s *Server) gatewayRoutes() {
 
 		// Call the gatewayService to download the object
 		res, err := s.gatewayService.GetObject(c.Context(), objectId)
-		switch err {
-		case nil:
+		switch {
+		case err == nil:
 			return c.Status(fiber.StatusOK).SendStream(res)
+		case errors.Is(err, s3.ErrObjectNotFound):
+			return c.Status(fiber.StatusNotFound).JSON(api.ErrorResponse{Message: "Object not found"})
+		case errors.Is(err, fiber.ErrRequestTimeout):
+			return c.Status(fiber.StatusServiceUnavailable).JSON(api.ErrorResponse{Message: "Request timed out"})
 		default:
 			s.logger.Error("Failed to process request", zap.Error(err))
 			return c.Status(fiber.StatusInternalServerError).JSON(api.ErrorResponse{Message: "Failed to download object"})
