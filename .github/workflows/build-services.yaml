@@ -1,4 +1,4 @@
-name: "Build and Push service"
+name: "Build Docker image"
 on:
   push:
     branches:
@@ -30,7 +30,7 @@ on:
 
 jobs:
   build-service:
-    name: "Build and Push service"
+    name: "Build service"
     uses: ./.github/workflows/build.yaml
     with:
       service: s3-gateway

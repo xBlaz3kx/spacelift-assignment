@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
-	"go.uber.org/zap"
 )
 
 var alphanumeric = regexp.MustCompile("^[a-zA-Z0-9_]{1,32}$")
@@ -33,7 +32,6 @@ func ValidateContentType(acceptedContentType string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		// Get the Content-Type header
 		contentType := c.Get("Content-Type")
-		zap.L().Info("Content-Type", zap.String("Content-Type", contentType))
 
 		// Check if the Content-Type is valid
 		if !strings.Contains(contentType, acceptedContentType) {
