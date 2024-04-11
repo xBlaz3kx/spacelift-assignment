@@ -1,0 +1,86 @@
+openapi: 3.0.3
+info:
+  title: S3 Gateway
+  description: Home assignment for Spacelift - S3 Gateway
+  version: 1.0.0
+
+servers:
+  - url: 'http://localhost:3000'
+    description: 'Local server'
+
+paths:
+  /object/{id}:
+    get:
+      description: Get a file with the given id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            multipart/form-data:
+              schema:
+                type: object
+                properties:
+                  file:
+                    type: string
+                    format: binary
+        404:
+          $ref: '#/components/responses/errorResponse'
+        500:
+          $ref: '#/components/responses/errorResponse'
+        503:
+          $ref: '#/components/responses/errorResponse'
+    put:
+      description: Upload a file with the given id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          $ref: '#/components/responses/successResponse'
+        500:
+          $ref: '#/components/responses/errorResponse'
+        503:
+          $ref: '#/components/responses/errorResponse'
+
+components:
+  responses:
+    successResponse:
+      description: Success response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+
+    errorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              code:
+                type: integer
