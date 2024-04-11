@@ -17,7 +17,7 @@ type Service interface {
 	AddOrUpdateObject(ctx context.Context, objectId string, file multipart.File) error
 	GetObject(ctx context.Context, objectId string) (io.Reader, error)
 	Ready(ctx context.Context) bool
-	assignObjectToInstance(ctx context.Context, objectId string, instances []discovery.S3Instance) (*discovery.S3Instance, error)
+	shardObjectToInstance(ctx context.Context, objectId string) (*discovery.S3Instance, error)
 }
 
 // ServiceV1 is the implementation of the Service interface
@@ -39,14 +39,8 @@ func (s *ServiceV1) AddOrUpdateObject(ctx context.Context, objectId string, data
 	logger := s.logger.With(zap.String("objectId", objectId))
 	logger.Info("Adding or updating object in S3")
 
-	// Discover which S3 instances are available
-	instances, err := s.discoveryService.DiscoverS3Instances(ctx)
-	if err != nil {
-		return err
-	}
-
 	// Determine which instance to write to based on the objectId
-	instance, err := s.assignObjectToInstance(ctx, objectId, instances)
+	instance, err := s.shardObjectToInstance(ctx, objectId)
 	if err != nil {
 		return errors.Wrap(err, "failed to assign object to instance")
 	}
@@ -66,14 +60,8 @@ func (s *ServiceV1) GetObject(ctx context.Context, objectId string) (io.Reader, 
 	logger := s.logger.With(zap.String("objectId", objectId))
 	logger.Info("Getting object from S3")
 
-	// Based on the ID, discover which S3 instance to use and fetch the object
-	instances, err := s.discoveryService.DiscoverS3Instances(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	// Determine which instance to read from based on the objectId
-	instance, err := s.assignObjectToInstance(ctx, objectId, instances)
+	instance, err := s.shardObjectToInstance(ctx, objectId)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to assign object to instance")
 	}
@@ -89,7 +77,6 @@ func (s *ServiceV1) GetObject(ctx context.Context, objectId string) (io.Reader, 
 	// Get the object from the S3 instance
 	obj, err := client.GetObject(ctx, objectId)
 	if err != nil {
-
 		return nil, errors.Wrap(err, "failed to get object from S3")
 	}
 
@@ -106,9 +93,15 @@ func (s *ServiceV1) Ready(ctx context.Context) bool {
 	return s.discoveryService.Ready(ctx)
 }
 
-// assignObjectToInstance chooses an instance to write an object to. A form of sharding is used to determine the instance.
-func (s *ServiceV1) assignObjectToInstance(ctx context.Context, objectId string, instances []discovery.S3Instance) (*discovery.S3Instance, error) {
+// shardObjectToInstance chooses an instance to write an object to. A form of sharding is used to determine the instance.
+func (s *ServiceV1) shardObjectToInstance(ctx context.Context, objectId string) (*discovery.S3Instance, error) {
 	s.logger.Debug("Assigning object to instance", zap.String("objectId", objectId))
+
+	// Discover available S3 instances
+	instances, err := s.discoveryService.DiscoverS3Instances(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	// If there are no instances available, return an error
 	if len(instances) == 0 {

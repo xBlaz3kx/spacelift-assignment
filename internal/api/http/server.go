@@ -100,6 +100,7 @@ func (s *Server) gatewayRoutes() {
 		case err == nil:
 			return c.Status(fiber.StatusCreated).JSON(api.ErrorResponse{Message: "Object uploaded successfully"})
 		case errors.Is(err, fiber.ErrRequestTimeout):
+			s.logger.Error("Failed to process request", zap.Error(err))
 			return c.Status(fiber.StatusServiceUnavailable).JSON(api.ErrorResponse{Message: "Request timed out"})
 		default:
 			s.logger.Error("Failed to process request", zap.Error(err))
@@ -118,8 +119,10 @@ func (s *Server) gatewayRoutes() {
 		case err == nil:
 			return c.Status(fiber.StatusOK).SendStream(res)
 		case errors.Is(err, s3.ErrObjectNotFound):
+			s.logger.Error("Failed to process request", zap.Error(err))
 			return c.Status(fiber.StatusNotFound).JSON(api.ErrorResponse{Message: "Object not found"})
 		case errors.Is(err, fiber.ErrRequestTimeout):
+			s.logger.Error("Failed to process request", zap.Error(err))
 			return c.Status(fiber.StatusServiceUnavailable).JSON(api.ErrorResponse{Message: "Request timed out"})
 		default:
 			s.logger.Error("Failed to process request", zap.Error(err))
