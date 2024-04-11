@@ -2,11 +2,32 @@ package middleware
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/zap"
 )
+
+var alphanumeric = regexp.MustCompile("^[a-zA-Z0-9_]{1,32}$")
+
+func validateObjectId(id string) bool {
+	return alphanumeric.MatchString(id)
+}
+
+func ValidateObjectId() fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		objectId := c.Params("id")
+
+		if !validateObjectId(objectId) {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Error{
+				Message: "Invalid object ID",
+			})
+		}
+
+		return c.Next()
+	}
+}
 
 func ValidateContentType(acceptedContentType string) fiber.Handler {
 	return func(c *fiber.Ctx) error {

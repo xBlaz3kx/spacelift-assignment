@@ -108,7 +108,7 @@ func (s *Server) gatewayRoutes() {
 	}
 
 	downloadHandler := func(c *fiber.Ctx) error {
-		c.Accepts("application/json")
+		c.Accepts("multipart/form-data")
 
 		objectId := c.Params("id")
 
@@ -127,6 +127,6 @@ func (s *Server) gatewayRoutes() {
 		}
 	}
 
-	group.Put("/:id", middleware.ValidateContentType("multipart/form-data"), timeout.NewWithContext(uploadHandler, time.Second*30))
-	group.Get("/:id", middleware.ValidateContentType("application/json"), timeout.NewWithContext(downloadHandler, time.Second*30))
+	group.Put("/:id", middleware.ValidateContentType("multipart/form-data"), middleware.ValidateObjectId(), timeout.NewWithContext(uploadHandler, time.Second*30))
+	group.Get("/:id", middleware.ValidateObjectId(), timeout.NewWithContext(downloadHandler, time.Second*30))
 }
