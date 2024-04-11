@@ -24,7 +24,11 @@ type Server struct {
 
 func NewServer(logger *zap.Logger, service gateway.Service) *Server {
 	// Initialize a new Fiber app with a custom error handler
-	fiberConfig := fiber.Config{ErrorHandler: middleware.FiberErrorHandler()}
+	fiberConfig := fiber.Config{
+		ErrorHandler: middleware.FiberErrorHandler(),
+		AppName:      "S3 Gateway",
+		ServerHeader: "S3-Gateway",
+	}
 	app := fiber.New(fiberConfig)
 
 	// Use zap logger middleware
@@ -73,6 +77,8 @@ func (s *Server) gatewayRoutes() {
 	group := s.app.Group("/object")
 
 	uploadHandler := func(c *fiber.Ctx) error {
+		c.Accepts("application/json")
+
 		objectId := c.Params("id")
 		// Validate objectId
 
@@ -102,6 +108,8 @@ func (s *Server) gatewayRoutes() {
 	}
 
 	downloadHandler := func(c *fiber.Ctx) error {
+		c.Accepts("application/json")
+
 		objectId := c.Params("id")
 
 		// Call the gatewayService to download the object
@@ -119,6 +127,6 @@ func (s *Server) gatewayRoutes() {
 		}
 	}
 
-	group.Put("/:id", timeout.NewWithContext(uploadHandler, time.Second*30))
-	group.Get("/:id", timeout.NewWithContext(downloadHandler, time.Second*30))
+	group.Put("/:id", middleware.ValidateContentType("multipart/form-data"), timeout.NewWithContext(uploadHandler, time.Second*30))
+	group.Get("/:id", middleware.ValidateContentType("application/json"), timeout.NewWithContext(downloadHandler, time.Second*30))
 }

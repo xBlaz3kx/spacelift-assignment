@@ -32,7 +32,7 @@ type MinioClient struct {
 // NewMinioClient creates a new instance of the Minio client based on the S3 instance
 func NewMinioClient(instance discovery.S3Instance) (*MinioClient, error) {
 	minioClient, err := minio.New(fmt.Sprintf("%s:%s", instance.Hostname, instance.Port), &minio.Options{
-		Creds:  credentials.NewStaticV4("", instance.AccessKey, instance.SecretKey),
+		Creds:  credentials.NewStaticV4(instance.AccessKey, instance.SecretKey, ""),
 		Secure: false,
 	})
 	if err != nil {
