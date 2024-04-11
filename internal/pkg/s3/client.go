@@ -1,6 +1,7 @@
 package s3
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -63,8 +64,15 @@ func (c *MinioClient) AddOrUpdateObject(ctx context.Context, objectId string, da
 		}
 	}
 
+	// Read the data from the reader (just to determine the length)
+	buf := new(bytes.Buffer)
+	_, err = buf.ReadFrom(data)
+	if err != nil {
+		return err
+	}
+
 	// Put the object in the S3 instance
-	_, err = c.client.PutObject(ctx, bucketName, objectId, data, 1, minio.PutObjectOptions{})
+	_, err = c.client.PutObject(ctx, bucketName, objectId, buf, int64(buf.Len()), minio.PutObjectOptions{})
 	if err != nil {
 
 		res := minio.ToErrorResponse(err)
