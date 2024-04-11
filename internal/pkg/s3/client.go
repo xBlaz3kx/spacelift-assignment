@@ -99,5 +99,14 @@ func (c *MinioClient) GetObject(ctx context.Context, objectId string) (io.Reader
 		return nil, errors.Wrap(err, "failed to get object from S3")
 	}
 
+	stat, err := obj.Stat()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get object from S3")
+	}
+
+	if stat.Size == 0 {
+		return nil, ErrObjectNotFound
+	}
+
 	return obj, nil
 }
