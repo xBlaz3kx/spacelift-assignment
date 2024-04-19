@@ -9,6 +9,21 @@ servers:
     description: 'Local server'
 
 paths:
+  /objects:
+    get:
+      description: Get all object ids from the S3 instances
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+        500:
+          $ref: '#/components/responses/errorResponse'
+        503:
+          $ref: '#/components/responses/errorResponse'
+
   /object/{id}:
     get:
       description: Get a file with the given id

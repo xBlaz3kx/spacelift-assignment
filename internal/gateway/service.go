@@ -2,9 +2,11 @@ package gateway
 
 import (
 	"context"
+	"fmt"
 	"hash/fnv"
 	"io"
 	"mime/multipart"
+	"sync"
 
 	"github.com/pkg/errors"
 	"github.com/spacelift-io/homework-object-storage/internal/discovery"
@@ -16,6 +18,7 @@ import (
 type Service interface {
 	AddOrUpdateObject(ctx context.Context, objectId string, file multipart.File) error
 	GetObject(ctx context.Context, objectId string) (io.Reader, error)
+	GetObjects(ctx context.Context) ([]string, error)
 	Ready(ctx context.Context) bool
 	shardObjectToInstance(ctx context.Context, objectId string) (*discovery.S3Instance, error)
 }
@@ -81,6 +84,61 @@ func (s *ServiceV1) GetObject(ctx context.Context, objectId string) (io.Reader, 
 	}
 
 	return obj, nil
+}
+
+// GetObjects get all objects (from all instances)
+func (s *ServiceV1) GetObjects(ctx context.Context) ([]string, error) {
+	s.logger.Info("Get all objects")
+
+	// Discover available S3 instances
+	instances, err := s.discoveryService.DiscoverS3Instances(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	objectIds := []string{}
+
+	// Launch workers.
+	var wg sync.WaitGroup
+	errChan := make(chan error, len(instances))
+
+	objectIdMutex := sync.Mutex{}
+
+	for _, instance := range instances {
+		wg.Add(1)
+
+		go func(s3Instance discovery.S3Instance) {
+			defer wg.Done()
+
+			// Minio client must be dynamically created, based on the S3 instance
+			client, err := s3.NewMinioClient(s3Instance)
+			if err != nil {
+				errChan <- errors.Wrap(err, fmt.Sprintf("unable to create s3 client for instance: %d", s3Instance.InstanceNum))
+				return
+			}
+
+			objects, err := client.GetObjects(ctx)
+			if err != nil {
+				errChan <- errors.Wrap(err, fmt.Sprintf("unable to list objectIds for instance: %d", s3Instance.InstanceNum))
+				return
+			}
+
+			objectIdMutex.Lock()
+			objectIds = append(objectIds, objects...)
+			objectIdMutex.Unlock()
+		}(instance)
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	for readErr := range errChan {
+		if !errors.Is(readErr, nil) {
+			return nil, readErr
+		}
+	}
+
+	return objectIds, nil
 }
 
 // Ready checks if the service is ready (if the Minio client is online and the Docker client is connected)

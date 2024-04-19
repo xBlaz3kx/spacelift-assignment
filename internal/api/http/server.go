@@ -132,4 +132,22 @@ func (s *Server) gatewayRoutes() {
 
 	group.Put("/:id", middleware.ValidateContentType("multipart/form-data"), middleware.ValidateObjectId(), timeout.NewWithContext(uploadHandler, time.Second*30))
 	group.Get("/:id", middleware.ValidateObjectId(), timeout.NewWithContext(downloadHandler, time.Second*30))
+
+	listHandler := func(c *fiber.Ctx) error {
+		// List all objects from s3 instances
+
+		res, err := s.gatewayService.GetObjects(c.Context())
+		switch {
+		case err == nil:
+			return c.Status(fiber.StatusOK).JSON(res)
+		case errors.Is(err, fiber.ErrRequestTimeout):
+			s.logger.Error("Failed to process request", zap.Error(err))
+			return c.Status(fiber.StatusServiceUnavailable).JSON(api.ErrorResponse{Message: "Request timed out"})
+		default:
+			s.logger.Error("Failed to process request", zap.Error(err))
+			return c.Status(fiber.StatusInternalServerError).JSON(api.ErrorResponse{Message: "Failed to download object"})
+		}
+	}
+
+	s.app.Get("/objects", timeout.NewWithContext(listHandler, time.Second*30))
 }

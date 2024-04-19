@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -23,6 +22,7 @@ const (
 type Client interface {
 	AddOrUpdateObject(ctx context.Context, objectId string, data io.Reader) error
 	GetObject(ctx context.Context, objectId string) (io.Reader, error)
+	GetObjects(ctx context.Context) ([]string, error)
 }
 
 type MinioClient struct {
@@ -64,15 +64,8 @@ func (c *MinioClient) AddOrUpdateObject(ctx context.Context, objectId string, da
 		}
 	}
 
-	// Read the data from the reader (just to determine the length)
-	buf := new(bytes.Buffer)
-	_, err = buf.ReadFrom(data)
-	if err != nil {
-		return err
-	}
-
 	// Put the object in the S3 instance
-	_, err = c.client.PutObject(ctx, bucketName, objectId, buf, int64(buf.Len()), minio.PutObjectOptions{})
+	_, err = c.client.PutObject(ctx, bucketName, objectId, data, -1, minio.PutObjectOptions{})
 	if err != nil {
 
 		res := minio.ToErrorResponse(err)
@@ -109,4 +102,34 @@ func (c *MinioClient) GetObject(ctx context.Context, objectId string) (io.Reader
 	}
 
 	return obj, nil
+}
+
+// GetObjects Get all objectsIds from the S3 instance
+func (c *MinioClient) GetObjects(ctx context.Context) ([]string, error) {
+	c.logger.Info("Getting objects from s3 instance")
+
+	objectChan := c.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{})
+
+	objectIds := []string{}
+
+	for {
+		select {
+		case object, ok := <-objectChan:
+			if !ok {
+				return objectIds, nil
+			}
+
+			if !errors.Is(object.Err, nil) {
+				return nil, object.Err
+			}
+
+			objectIds = append(objectIds, object.Key)
+		case <-ctx.Done():
+			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+				return nil, ctx.Err()
+			}
+
+			return objectIds, nil
+		}
+	}
 }

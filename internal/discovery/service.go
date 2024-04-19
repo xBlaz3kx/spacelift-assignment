@@ -88,6 +88,8 @@ func (s *ServiceV1) getContainerDetails(ctx context.Context, containerId string)
 	}
 
 	// Extract the instance ID from the container name - the number after the prefix
+	// Example: "/amazin-object-storage-node-1"
+	// Example: "/amazin-object-storage-node"
 	instanceIdString := strings.TrimSuffix(strings.TrimPrefix(containerName, prefix), "-1")
 	instanceId, err := strconv.Atoi(instanceIdString)
 	if err != nil {
