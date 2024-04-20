@@ -19,6 +19,7 @@ type Service interface {
 	AddOrUpdateObject(ctx context.Context, objectId string, file multipart.File) error
 	GetObject(ctx context.Context, objectId string) (io.Reader, error)
 	GetObjects(ctx context.Context) ([]string, error)
+	GetObjectsAsync(ctx context.Context) ([]string, error)
 	Ready(ctx context.Context) bool
 	shardObjectToInstance(ctx context.Context, objectId string) (*discovery.S3Instance, error)
 }
@@ -98,11 +99,41 @@ func (s *ServiceV1) GetObjects(ctx context.Context) ([]string, error) {
 
 	objectIds := []string{}
 
-	// Launch workers.
+	for _, instance := range instances {
+		// Minio client must be dynamically created, based on the S3 instance
+		client, err := s3.NewMinioClient(instance)
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("unable to create s3 client for instance: %d", instance.InstanceNum))
+		}
+
+		objects, err := client.GetObjects(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, fmt.Sprintf("unable to list objectIds for instance: %d", instance.InstanceNum))
+		}
+
+		objectIds = append(objectIds, objects...)
+	}
+
+	return objectIds, nil
+}
+
+// GetObjects get all objects from all instances asnychonously
+func (s *ServiceV1) GetObjectsAsync(ctx context.Context) ([]string, error) {
+	s.logger.Info("Get all objects")
+
+	// Discover available S3 instances
+	instances, err := s.discoveryService.DiscoverS3Instances(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// ObjectIds need to be accessed in a thread-safe way
+	objectIds := []string{}
+	objectIdMutex := sync.Mutex{}
+
+	// Create a wait group and an error channel
 	var wg sync.WaitGroup
 	errChan := make(chan error, len(instances))
-
-	objectIdMutex := sync.Mutex{}
 
 	for _, instance := range instances {
 		wg.Add(1)
@@ -129,9 +160,11 @@ func (s *ServiceV1) GetObjects(ctx context.Context) ([]string, error) {
 		}(instance)
 	}
 
+	// Wait for all workers to finish.
 	wg.Wait()
-	close(errChan)
 
+	// Check if an error occurred in any of the workers.
+	close(errChan)
 	for readErr := range errChan {
 		if !errors.Is(readErr, nil) {
 			return nil, readErr
@@ -171,7 +204,14 @@ func (s *ServiceV1) shardObjectToInstance(ctx context.Context, objectId string) 
 	objectIdHash := hashId(objectId)
 	instanceNum := objectIdHash % uint64(len(instances))
 
-	return &instances[instanceNum], nil
+	// Get the instance based on the instanceNum -> Fixed the function based on feedback
+	for _, instance := range instances {
+		if instance.InstanceNum == int(instanceNum) {
+			return &instance, nil
+		}
+	}
+
+	return nil, errors.New("instance not found or unavailable")
 }
 
 func hashId(id string) uint64 {

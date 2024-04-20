@@ -115,6 +115,7 @@ func (c *MinioClient) GetObjects(ctx context.Context) ([]string, error) {
 	for {
 		select {
 		case object, ok := <-objectChan:
+			// If the channel is closed return the objectIds
 			if !ok {
 				return objectIds, nil
 			}
